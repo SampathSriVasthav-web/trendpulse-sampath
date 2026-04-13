@@ -4,27 +4,18 @@ import json
 from datetime import datetime
 import os
 
-# API endpoints
 TOP_URL = "https://hacker-news.firebaseio.com/v0/topstories.json"
 DETAIL_URL = "https://hacker-news.firebaseio.com/v0/item/{}.json"
 
-headers = {"User-Agent": "TrendPulseApp/1.0"}
-
-# category keywords
+# full keywords (IMPORTANT)
 category_map = {
-    "technology": ["ai", "software", "tech", "code", "computer", "data", "api"],
-    "worldnews": ["war", "government", "country", "election", "climate", "global"],
-    "sports": ["nfl", "nba", "fifa", "game", "team", "player"],
-    "science": ["research", "study", "space", "physics", "nasa", "biology"],
-    "entertainment": ["movie", "film", "music", "netflix", "show", "stream"]
+    "technology": ["ai", "software", "tech", "code", "computer", "data", "api", "cloud", "gpu", "llm"],
+    "worldnews": ["war", "government", "country", "president", "election", "climate", "attack", "global"],
+    "sports": ["nfl", "nba", "fifa", "sport", "game", "team", "player", "league", "championship"],
+    "science": ["research", "study", "space", "physics", "biology", "discovery", "nasa", "genome"],
+    "entertainment": ["movie", "film", "music", "netflix", "game", "book", "show", "award", "streaming"]
 }
 
-# store collected stories
-stories = []
-count_per_category = {key: 0 for key in category_map}
-
-
-# function to decide category
 def assign_category(title):
     text = title.lower()
     for cat, words in category_map.items():
@@ -33,68 +24,61 @@ def assign_category(title):
     return None
 
 
-# fetch top IDs
+stories = []
+
 try:
-    response = requests.get(TOP_URL, headers=headers)
-    response.raise_for_status()
-    top_ids = response.json()[:500]
-except Exception as e:
-    print("Error fetching top stories:", e)
+    top_ids = requests.get(TOP_URL).json()
+except:
     top_ids = []
 
+count_per_category = {cat: 0 for cat in category_map}
 
-# loop through IDs
-for sid in top_ids:
-    try:
-        res = requests.get(DETAIL_URL.format(sid), headers=headers)
-        if res.status_code != 200:
-            continue
+# category-wise loop (IMPORTANT)
+for category in category_map:
+    for sid in top_ids:
+        try:
+            res = requests.get(DETAIL_URL.format(sid))
+            if res.status_code != 200:
+                continue
 
-        item = res.json()
+            item = res.json()
+            if not item or "title" not in item:
+                continue
 
-        if not item or "title" not in item:
-            continue
+            cat = assign_category(item["title"])
+            if cat != category:
+                continue
 
-        cat = assign_category(item["title"])
+            if count_per_category[category] >= 25:
+                break
 
-        if not cat:
-            continue
+            story = {
+                "post_id": item.get("id"),
+                "title": item.get("title"),
+                "category": category,
+                "score": item.get("score", 0),
+                "num_comments": item.get("descendants", 0),
+                "author": item.get("by"),
+                "collected_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
 
-        # limit per category
-        if count_per_category[cat] >= 25:
-            continue
+            stories.append(story)
+            count_per_category[category] += 1
 
-        # create dictionary
-        story_data = {
-            "post_id": item.get("id"),
-            "title": item.get("title"),
-            "category": cat,
-            "score": item.get("score", 0),
-            "num_comments": item.get("descendants", 0),
-            "author": item.get("by"),
-            "collected_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+        except:
+            print("Error fetching story")
 
-        stories.append(story_data)
-        count_per_category[cat] += 1
-
-        # stop after enough stories
-        if len(stories) >= 125:
-            break
-
-    except Exception as err:
-        print("Skipping ID due to error:", err)
+    # IMPORTANT sleep
+    time.sleep(2)
 
 
-# create folder if not exists
+# save file
 if not os.path.exists("data"):
     os.makedirs("data")
 
-# file name with date
 file_name = f"data/trends_{datetime.now().strftime('%Y%m%d')}.json"
 
-# save JSON
-with open(file_name, "w") as file:
-    json.dump(stories, file, indent=4)
+with open(file_name, "w") as f:
+    json.dump(stories, f, indent=4)
 
 print(f"Collected {len(stories)} stories. Saved to {file_name}")
