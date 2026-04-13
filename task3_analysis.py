@@ -1,37 +1,56 @@
 import pandas as pd
+import numpy as np
 import os
 
-file_path = "data/cleaned_trends.csv"
+file_path = "data/trends_clean.csv"
 
-# check file
 if not os.path.exists(file_path):
-    print("CSV file not found")
+    print("File not found")
     exit()
 
 # load data
 df = pd.read_csv(file_path)
 
 # basic info
-print("Total records:", len(df))
+print("Loaded data:", df.shape)
 
-# top 5 highest score posts
-top_scores = df.sort_values(by="score", ascending=False).head(5)
-print("\nTop 5 by score:\n", top_scores[["title", "score"]])
+print("\nFirst 5 rows:")
+print(df.head())
 
-# most commented posts
-top_comments = df.sort_values(by="num_comments", ascending=False).head(5)
-print("\nTop 5 by comments:\n", top_comments[["title", "num_comments"]])
+# averages
+print("\nAverage score:", df["score"].mean())
+print("Average comments:", df["num_comments"].mean())
 
-# category count
-category_count = df["category"].value_counts()
-print("\nStories per category:\n", category_count)
 
-# average score per category
-avg_score = df.groupby("category")["score"].mean()
-print("\nAverage score per category:\n", avg_score)
+# --- NumPy analysis ---
+scores = df["score"].values
 
-# save analysis
-output_file = "data/analysis_results.csv"
-avg_score.to_csv(output_file)
+print("\n--- NumPy Stats ---")
+print("Mean score:", np.mean(scores))
+print("Median score:", np.median(scores))
+print("Std deviation:", np.std(scores))
+print("Max score:", np.max(scores))
+print("Min score:", np.min(scores))
 
-print(f"\nAnalysis saved to {output_file}")
+# most category
+most_cat = df["category"].value_counts().idxmax()
+count = df["category"].value_counts().max()
+print(f"\nMost stories in: {most_cat} ({count} stories)")
+
+# most commented story
+top = df.loc[df["num_comments"].idxmax()]
+print(f'Most commented story: "{top["title"]}" - {top["num_comments"]} comments')
+
+
+# --- Add new columns ---
+df["engagement"] = df["num_comments"] / (df["score"] + 1)
+
+avg_score = df["score"].mean()
+df["is_popular"] = df["score"] > avg_score
+
+
+# save file
+output_file = "data/trends_analysed.csv"
+df.to_csv(output_file, index=False)
+
+print(f"\nSaved to {output_file}")
