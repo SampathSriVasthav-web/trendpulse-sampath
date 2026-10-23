@@ -2,7 +2,12 @@ import json
 import csv
 import os
 
-input_file = "data/trends_20260413.json"
+import glob
+files = sorted(glob.glob("data/trends_*.json"))
+if not files:
+    print("File not found")
+    exit()
+input_file = files[-1]
 output_file = "data/trends_clean.csv"
 
 if not os.path.exists(input_file):
